@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. Configuração da Página
 st.set_page_config(
     page_title="Minerva Motors | Cotação Inteligente",
     page_icon="🏎️",
@@ -10,7 +9,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. CSS Personalizado (Visual Limpo e Profissional)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
@@ -66,7 +64,6 @@ def get_historico_fake():
 
 df_historico = get_historico_fake()
 
-# --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown("# 🏎️ Minerva Motors")
     st.markdown("---")
