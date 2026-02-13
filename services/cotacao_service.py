@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 from sqlalchemy import text
-from database import get_engine
+from database.database import get_engine
 
 class CotacaoService:
     def __init__(self):
