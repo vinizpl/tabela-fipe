@@ -95,10 +95,6 @@ python seed.py
 
 O script `seed.py` executará inserts nas tabelas de exemplo e reiniciará os IDs.
 
-## 🧪 Testes e desenvolvimento
-
-- Não há suíte de testes inclusa — recomenda‑se adicionar `pytest` e exemplos de integração com o DB.
-- Use `services/cotacao_service.py` como exemplo de onde colocar lógica reutilizável.
 
 ## ⚠️ Problemas comuns
 
