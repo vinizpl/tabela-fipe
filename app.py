@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from services.cotacao_service import CotacaoService
 
 st.set_page_config(
     page_title="Minerva Motors | Cotação Inteligente",
@@ -16,7 +17,7 @@ st.markdown("""
     html, body, [class*="css"]  {
         font-family: 'Roboto', sans-serif;
     }
-
+    
     /* Cards de KPI */
     .kpi-card {
         background-color: #262730;
@@ -47,95 +48,95 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4);
     }
     
-    /* Remove padding do topo */
     .block-container { padding-top: 2rem; }
 </style>
 """, unsafe_allow_html=True)
 
-def get_historico_fake():
-    dates = pd.date_range(start="2025-09-01", periods=6, freq='ME')
-    data = {
-        'Mês': dates,
-        'Preço Médio': [44500, 44800, 44200, 45100, 45500, 45200],
-        'Preço Mínimo': [43000, 43500, 43000, 44000, 44200, 44000],
-        'Preço Máximo': [46000, 46500, 45500, 46800, 47000, 46500]
-    }
-    return pd.DataFrame(data)
+@st.cache_resource
+def get_service():
+    return CotacaoService()
 
-df_historico = get_historico_fake()
+service = get_service()
 
 with st.sidebar:
     st.markdown("# 🏎️ Minerva Motors")
     st.markdown("---")
     st.markdown("### ⚙️ Filtros de Pesquisa")
     
-    marca = st.selectbox("Marca", ["Fiat", "Honda", "Toyota", "VW"])
-    modelos_dict = {"Fiat": ["Palio", "Mobi"], "Honda": ["Civic", "Fit"], "Toyota": ["Corolla"], "VW": ["Gol"]}
-    modelo = st.selectbox("Modelo", modelos_dict.get(marca, ["Selecione"]))
-    ano = st.selectbox("Ano Modelo", [2026, 2025, 2024])
+    marcas_disponiveis = service.listar_marcas()
+    marca = st.selectbox("Marca", marcas_disponiveis)
+    
+    modelos_disponiveis = service.listar_modelos(marca)
+    modelo = st.selectbox("Modelo", modelos_disponiveis)
+    
+    ano = st.selectbox("Ano Modelo", [2026, 2025, 2024, 2023])
     
     st.markdown(" ") 
-    st.markdown(" ") 
-    
     buscar = st.button("🔍 BUSCAR OFERTAS")
+
+if buscar:
+    df_ofertas = service.buscar_ofertas(marca, modelo, ano)
     
-    if buscar:
-        st.session_state['buscou'] = True
-    if 'buscou' not in st.session_state:
-        st.session_state['buscou'] = True 
+    service.registrar_log({
+        "marca": marca, 
+        "modelo": modelo, 
+        "ano": ano,
+        "origem": "streamlit_ui"
+    })
 
-if st.session_state['buscou']:
-    st.markdown(f"""## Resultados para: <span style='color:#FF4B4B'>{marca} {modelo} ({ano})</span>""", unsafe_allow_html=True)
-    st.markdown("---")
-
-    col1, col2, col3, col4 = st.columns(4)
-    
-    def kpi_card(title, value, delta, color="#FF4B4B"):
-        return f"""
-        <div class="kpi-card" style="border-left: 5px solid {color}">
-            <div class="kpi-title">{title}</div>
-            <div class="kpi-value">{value}</div>
-            <div class="kpi-delta">{delta}</div>
-        </div>
-        """
-
-    with col1: st.markdown(kpi_card("Preço Médio", "R$ 45.200", "▲ 1.2%", "#3498db"), unsafe_allow_html=True)
-    with col2: st.markdown(kpi_card("Menor Oferta", "R$ 44.000", "Autos Russas", "#2ecc71"), unsafe_allow_html=True)
-    with col3: st.markdown(kpi_card("Maior Oferta", "R$ 46.500", "Cariri Motors", "#e74c3c"), unsafe_allow_html=True)
-    with col4: st.markdown(kpi_card("Disponibilidade", "12 Lojas", "Ceará", "#f1c40f"), unsafe_allow_html=True)
-
-    st.markdown(" ")
-
-    col_graf, col_tab = st.columns([2, 1])
-
-    with col_graf:
-        st.markdown("#### 📈 Evolução de Preços")
-        fig = px.area(df_historico, x='Mês', y=['Preço Mínimo', 'Preço Médio', 'Preço Máximo'],
-                      color_discrete_sequence=['#2ecc71', '#3498db', '#e74c3c'])
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            legend_title="", margin=dict(l=0, r=0, t=0, b=0), hovermode="x unified"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_tab:
-        st.markdown("#### 📋 Top Ofertas")
-        df_ofertas = pd.DataFrame({
-            "Loja": ["Autos Russas", "Fortal Veic", "Sobral Car", "Cariri Motors", "Iguatu Auto"],
-            "Cidade": ["Russas", "Fortaleza", "Sobral", "Juazeiro", "Iguatu"],
-            "Preço": [44000, 44500, 44800, 46500, 45000]
-        })
+    if not df_ofertas.empty:
+        kpis = service.calcular_kpis(df_ofertas)
         
-        st.dataframe(
-            df_ofertas.style.background_gradient(subset=['Preço'], cmap="RdYlGn_r", vmin=43000, vmax=47000)
-                              .format({"Preço": "R$ {:.2f}"}),
-            use_container_width=True,
-            height=300,
-            hide_index=True
-        )
+        st.markdown(f"""## Resultados para: <span style='color:#FF4B4B'>{marca} {modelo} ({ano})</span>""", unsafe_allow_html=True)
+        st.markdown("---")
 
-    st.markdown("---")
-    st.caption("© 2026 Minerva Motors - Sistema de Cotação")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        def kpi_card(title, value, subtext, color="#FF4B4B"):
+            return f"""
+            <div class="kpi-card" style="border-left: 5px solid {color}">
+                <div class="kpi-title">{title}</div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-delta">{subtext}</div>
+            </div>
+            """
+
+        with col1: st.markdown(kpi_card("Preço Médio", f"R$ {kpis['media']:,.2f}", "Calculado hoje", "#3498db"), unsafe_allow_html=True)
+        with col2: st.markdown(kpi_card("Menor Oferta", f"R$ {kpis['min']:,.2f}", kpis['loja_mais_barata'], "#2ecc71"), unsafe_allow_html=True)
+        with col3: st.markdown(kpi_card("Maior Oferta", f"R$ {kpis['max']:,.2f}", kpis['loja_mais_cara'], "#e74c3c"), unsafe_allow_html=True)
+        with col4: st.markdown(kpi_card("Total Ofertas", str(kpis['total_ofertas']), kpis['regiao_predominante'], "#f1c40f"), unsafe_allow_html=True)
+
+        st.markdown(" ")
+
+        col_graf, col_tab = st.columns([2, 1])
+
+        with col_graf:
+            st.markdown("#### 📈 Histórico de Preços (Tendência)")
+            df_hist = service.obter_historico_precos(modelo)
+            
+            if not df_hist.empty:
+                fig = px.area(df_hist, x='Mês', y=['Preço Mínimo', 'Preço Médio', 'Preço Máximo'],
+                              color_discrete_sequence=['#2ecc71', '#3498db', '#e74c3c'])
+                fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", legend_title="", hovermode="x unified")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Dados históricos insuficientes para gerar gráfico.")
+
+        with col_tab:
+            st.markdown("#### 📋 Detalhes das Ofertas")
+            # Tabela Real
+            st.dataframe(
+                df_ofertas[["Loja", "Região", "Preço", "Opcionais"]].style.format({"Preço": "R$ {:.2f}"}),
+                use_container_width=True,
+                height=400,
+                hide_index=True
+            )
+            
+    else:
+        st.warning(f"Nenhuma oferta encontrada para {marca} {modelo} no ano {ano}.")
+        st.info("Dica: Tente mudar o ano ou verifique se o modelo possui cotações cadastradas.")
 
 else:
-    st.info("Utilize os filtros laterais para iniciar.")
+    st.info("👈 Utilize os filtros laterais para iniciar a cotação.")
+    st.markdown("---")
+    st.caption("© 2026 Minerva Motors - Sistema Conectado ao PostgreSQL")
